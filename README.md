@@ -5,7 +5,7 @@ colorFrom: indigo
 colorTo: blue
 sdk: docker
 pinned: false
-app_port: 8000
+app_port: 7860
 base_path: /web
 tags:
   - openenv
@@ -127,7 +127,7 @@ class Diff(BaseModel):
 docker build -t code_review_env-env:latest .
 
 # Run the server
-docker run -p 8000:8000 code_review_env-env:latest
+docker run -p 7860:7860 code_review_env-env:latest
 ```
 
 Then run the inference agent:
@@ -136,7 +136,7 @@ Then run the inference agent:
 export API_BASE_URL=https://api-inference.huggingface.co/v1
 export MODEL_NAME=meta-llama/Llama-3.3-70B-Instruct
 export HF_TOKEN=hf-your-token-here
-export ENV_URL=http://localhost:8000
+export ENV_URL=http://localhost:7860
 
 python inference.py --difficulty all
 ```
@@ -149,7 +149,7 @@ pip install uv
 uv sync
 
 # Start the server
-uvicorn server.app:app --reload --port 8000
+uvicorn server.app:app --reload --port 7860
 
 # In another terminal, run the demo (rule-based agent)
 python run_demo.py
