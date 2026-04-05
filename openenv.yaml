@@ -1,0 +1,80 @@
+spec_version: 1
+name: code_review_env
+display_name: "Code Review AI Environment"
+description: >
+  An RL environment where an AI agent acts as a senior code reviewer.
+  The agent receives code diffs and must decide to flag_bug, approve, or ignore them.
+  Tasks span easy (hardcoded secrets, SQL injection) to hard (JWT bypass, SSRF, ReDoS).
+  Rewards are partial-credit based on correctness and explanation quality.
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000
+tags:
+  - openenv
+  - code-review
+  - security
+  - reinforcement-learning
+
+action_space:
+  type: discrete
+  fields:
+    - name: action_type
+      type: string
+      values: [flag_bug, approve, ignore]
+      description: "The review decision"
+    - name: comment
+      type: string
+      description: "Explanation of the decision (used for partial credit on hard tasks)"
+    - name: severity
+      type: string
+      values: [critical, medium, low]
+      required: false
+      description: "Severity classification (optional)"
+
+observation_space:
+  fields:
+    - name: current_diff
+      type: object
+      description: "The code diff to review"
+    - name: steps_remaining
+      type: integer
+      description: "Steps left in the episode"
+    - name: step
+      type: integer
+      description: "Current step number"
+    - name: total_tasks
+      type: integer
+      description: "Total tasks in this episode"
+    - name: feedback
+      type: string
+      description: "Human-readable feedback on the last action"
+    - name: task_difficulty
+      type: string
+      values: [easy, medium, hard]
+      description: "Difficulty of the current task"
+    - name: reward
+      type: float
+      description: "Reward received for the last action"
+    - name: done
+      type: boolean
+      description: "Whether the episode is complete"
+
+reward:
+  min: -0.5
+  max: 1.0
+  description: >
+    +1.0 correct on easy/medium task,
+    +0.7 correct on hard task without comment,
+    +1.0 correct on hard task with comment,
+    -0.3 ignore on a real bug,
+     0.0 ignore on safe code,
+    -0.5 wrong action (approve bug or flag safe code)
+
+difficulties:
+  - easy
+  - medium
+  - hard
+  - all
+
+max_steps: 15
