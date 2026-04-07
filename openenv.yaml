@@ -61,15 +61,16 @@ observation_space:
       description: "Whether the episode is complete"
 
 reward:
-  min: -0.5
-  max: 1.0
+  min: 0.10
+  max: 0.90
   description: >
-    +1.0 correct on easy/medium task,
-    +0.7 correct on hard task without comment,
-    +1.0 correct on hard task with comment,
-    -0.3 ignore on a real bug,
-     0.0 ignore on safe code,
-    -0.5 wrong action (approve bug or flag safe code)
+    0.90 correct action on easy/medium task,
+    0.90 correct on hard task with explanatory comment,
+    0.70 correct on hard task without comment (partial credit),
+    0.50 ignore on safe code (cautious but acceptable),
+    0.30 ignore on a real bug (missed the issue),
+    0.15 flag safe code as bug (false positive),
+    0.10 approve a buggy diff (worst outcome -- ships a vulnerability)
 
 difficulties:
   - easy
@@ -78,3 +79,27 @@ difficulties:
   - all
 
 max_steps: 15
+
+tasks:
+  - name: easy_code_review
+    description: >
+      Review 5 easy code diffs for hardcoded secrets, SQL f-string injection,
+      division-by-zero without guard, unused imports (style, should ignore),
+      and a safe well-tested utility function (should approve).
+    grader: server.graders:easy_grader
+
+  - name: medium_code_review
+    description: >
+      Review 5 medium-difficulty diffs covering missing authentication before
+      data access, plaintext password storage, off-by-one index errors,
+      sensitive auth token written to logs, and an unsynchronised shared counter
+      (race condition).
+    grader: server.graders:medium_grader
+
+  - name: hard_code_review
+    description: >
+      Review 5 hard diffs requiring deep security expertise: JWT signature-
+      verification bypass, insecure pickle deserialisation (RCE), ReDoS via
+      catastrophic regex backtracking, Server-Side Request Forgery (SSRF),
+      and complex well-tested business logic (should approve).
+    grader: server.graders:hard_grader

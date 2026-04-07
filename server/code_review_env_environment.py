@@ -1,8 +1,8 @@
 from uuid import uuid4
 try:
-    from ..models import CodeReviewAction, CodeReviewObservation
+    from code_review_env.models import CodeReviewAction, CodeReviewObservation
 except ImportError:
-    from models import CodeReviewAction, CodeReviewObservation
+    from code_review_env.models import CodeReviewAction, CodeReviewObservation
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 from .tasks import get_tasks
@@ -126,7 +126,16 @@ class CodeReviewEnvironment(Environment):
         )
 
     # ──────────────────────────────────────────────────────────────
-    # _calculate_reward  (partial credit -- all values 0.0-1.0)
+    # _calculate_reward  (all values strictly in (0.1, 0.9))
+    # ──────────────────────────────────────────────────────────────
+    # Reward ladder (never exactly 0.0 or 1.0 — judge requires strict range):
+    #   0.90 correct action on easy/medium task
+    #   0.90 correct on hard task WITH explanatory comment
+    #   0.70 correct on hard task WITHOUT comment  (partial credit)
+    #   0.50 ignore on safe code  (cautious but acceptable — no harm)
+    #   0.30 ignore on a real bug  (missed the issue — bad, not catastrophic)
+    #   0.15 flag_bug on safe code  (false positive — wastes reviewer time)
+    #   0.10 approve a buggy diff  (worst outcome — ships a vulnerability)
     # ──────────────────────────────────────────────────────────────
     def _calculate_reward(self, action: CodeReviewAction, task) -> tuple[float, str]:
         correct = task.correct_action
@@ -137,44 +146,44 @@ class CodeReviewEnvironment(Environment):
         # ── Correct action ────────────────────────────────────────
         if given == correct:
             if difficulty == "hard" and not has_comment:
-                # Hard tasks: reward comment explaining the issue
-                return 0.7, (
+                # Hard tasks: partial credit without explanatory comment
+                return 0.70, (
                     task.feedback_on_correct
                     + " (Tip: add a comment explaining the vulnerability for full marks.)"
                 )
-            return 1.0, task.feedback_on_correct
+            return 0.90, task.feedback_on_correct
 
         # -- Wrong action -- nuanced penalties ----------------------
-        # ignore on a bug -> less bad than approving it
+        # ignore on a bug -> missed the issue (bad, but not catastrophic)
         if given == "ignore" and correct == "flag_bug":
-            return -0.3, (
+            return 0.30, (
                 "Incorrect -- you ignored a real bug. "
                 + task.feedback_on_wrong
             )
 
-        # ignore on safe code -> neutral (no harm done)
+        # ignore on safe code -> cautious but acceptable
         if given == "ignore" and correct == "approve":
-            return 0.0, (
+            return 0.50, (
                 "Acceptable -- you were cautious, but this diff is safe to approve. "
                 + task.feedback_on_wrong
             )
 
-        # flag_bug on safe code -> false positive
+        # flag_bug on safe code -> false positive (wastes reviewer time)
         if given == "flag_bug" and correct == "approve":
-            return -0.5, (
+            return 0.15, (
                 "Incorrect -- this diff is safe; flagging it is a false positive. "
                 + task.feedback_on_wrong
             )
 
-        # approve on a bug -> worst outcome
+        # approve on a bug -> worst outcome (ships a vulnerability)
         if given == "approve" and correct == "flag_bug":
-            return -0.5, (
+            return 0.10, (
                 "Incorrect -- you approved a buggy/vulnerable diff. "
                 + task.feedback_on_wrong
             )
 
         # Fallback
-        return -0.5, task.feedback_on_wrong
+        return 0.10, task.feedback_on_wrong
 
     # ──────────────────────────────────────────────────────────────
     # state property (required by OpenEnv)

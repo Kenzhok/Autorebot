@@ -35,8 +35,8 @@ try:
     from code_review_env import CodeReviewAction, CodeReviewEnv
 except ImportError:
     sys.path.insert(0, os.path.dirname(__file__))
-    from client import CodeReviewEnv
-    from models import CodeReviewAction
+    from code_review_env.client import CodeReviewEnv
+    from code_review_env.models import CodeReviewAction
 
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -48,10 +48,12 @@ HF_TOKEN     = os.environ.get("HF_TOKEN")  # NO default — must be set explicit
 BENCHMARK    = "code_review_env"
 VALID_ACTIONS = {"flag_bug", "approve", "ignore"}
 
-# Reward range per step in this environment: [-0.5, 1.0]
-# We normalise score to [0, 1] by shifting and scaling.
-REWARD_MIN = -0.5   # worst possible per step
-REWARD_MAX =  1.0   # best possible per step
+# Reward range per step in this environment: (0.10, 0.90)
+# Since rewards are already normalised to a (0,1) sub-range we can use the
+# mean directly.  We still clamp with an epsilon buffer so the final score
+# is strictly between 0 and 1 (judge requirement: no 0.0 or 1.0).
+REWARD_MIN = 0.10   # worst possible per step  (approve a bug)
+REWARD_MAX = 0.90   # best possible per step   (correct action)
 
 
 # ── Mandatory logging helpers (judge-parsed format) ───────────────────────────
@@ -160,21 +162,19 @@ def call_llm(client: OpenAI, prompt: str) -> tuple:
     return action_type, comment
 
 
-# ── Score normalisation ────────────────────────────────────────────────────────
+# ── Score computation ─────────────────────────────────────────────────────────
 def compute_score(rewards: List[float]) -> float:
     """
-    Normalise cumulative reward to [0, 1].
+    Return the mean per-step reward, clamped strictly to (0.01, 0.99).
 
-    Per-step reward range: [-0.5, 1.0]
-    We shift so worst possible = 0, best possible = 1:
-        score = (mean_reward - REWARD_MIN) / (REWARD_MAX - REWARD_MIN)
-    Result is clamped to [0, 1] for safety.
+    Per-step rewards are already in the (0.10, 0.90) sub-range so the mean
+    is naturally within (0, 1).  The epsilon clamp is a safety net that
+    guarantees the judge's invariant: score is never exactly 0.0 or 1.0.
     """
     if not rewards:
-        return 0.0
+        return 0.50   # neutral default — no steps taken
     mean_reward = sum(rewards) / len(rewards)
-    score = (mean_reward - REWARD_MIN) / (REWARD_MAX - REWARD_MIN)
-    return min(max(score, 0.0), 1.0)
+    return min(max(round(mean_reward, 4), 0.01), 0.99)
 
 
 # ── Main episode loop ──────────────────────────────────────────────────────────
