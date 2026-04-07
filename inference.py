@@ -100,55 +100,66 @@ def get_llm_client() -> OpenAI:
 # ── Prompt builder ─────────────────────────────────────────────────────────────
 def build_prompt(obs) -> str:
     diff = obs.current_diff
-    return f"""You are a senior software engineer performing a code review.
+    difficulty = obs.task_difficulty
+    return f"""You are a senior software engineer performing a security-focused code review.
 
 Analyze the following code diff and decide ONE action:
-- flag_bug  -> the diff contains a bug, vulnerability, or serious issue
+- flag_bug  -> the diff contains a bug, vulnerability, or security issue
 - approve   -> the diff is safe and correct, approve it
-- ignore    -> the diff is a minor style/cosmetic issue, not worth flagging
+- ignore    -> minor style/cosmetic issue only, not worth flagging
 
 Code Diff:
 {diff.diff_text}
 
 Context:
-- touches_auth: {diff.touches_auth}  (does it touch security/auth code?)
-- has_tests:    {diff.has_tests}     (are tests included?)
-- risk_hints:   {diff.risk_hints}    (known risk patterns detected)
+- difficulty:   {difficulty}
+- touches_auth: {diff.touches_auth}  (touches security/auth code?)
+- has_tests:    {diff.has_tests}     (tests included?)
+- risk_hints:   {diff.risk_hints}    (detected risk patterns)
 
-Rules:
-- If security or authentication logic is changed without tests -> flag_bug
-- If there is SQL string concatenation / f-string interpolation -> flag_bug
-- If credentials or tokens are hardcoded -> flag_bug
-- If the diff is clearly harmless and well-tested -> approve
-- If it is only a style issue (unused imports, formatting) -> ignore
+Security review rules:
+- SQL string concatenation / f-string interpolation -> flag_bug (SQL injection)
+- Hardcoded credentials, tokens, or secrets -> flag_bug
+- Missing auth/authz check before data access -> flag_bug
+- Insecure deserialization (pickle, yaml.load) -> flag_bug
+- User-controlled URLs fetched without allowlist -> flag_bug (SSRF)
+- JWT decoded with signature verification disabled -> flag_bug
+- Regex with nested quantifiers like (a+)+ -> flag_bug (ReDoS)
+- Secret comparison with == instead of hmac.compare_digest -> flag_bug
+- User input used in file paths without sanitization -> flag_bug
+- Clearly harmless, well-tested code -> approve
+- Style issues only (unused imports, formatting) -> ignore
 
-Also provide a brief one-sentence explanation of your decision.
-
-Respond in this EXACT format (two lines only):
+Respond in this EXACT format (three lines only):
 ACTION: <flag_bug|approve|ignore>
-COMMENT: <one sentence explanation>"""
+SEVERITY: <critical|medium|low|none>
+COMMENT: <one sentence explanation of your decision>"""
+
 
 
 # ── LLM call ──────────────────────────────────────────────────────────────────
 def call_llm(client: OpenAI, prompt: str) -> tuple:
     """
-    Call the LLM and parse action + comment from response.
-    Returns (action_type, comment). Falls back to 'flag_bug' on any error.
+    Call the LLM and parse action, severity, and comment from response.
+    Returns (action_type, severity, comment). Falls back to 'flag_bug' on error.
     """
     try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=100,
+            max_tokens=120,
             temperature=0.1,
         )
         raw = response.choices[0].message.content.strip()
     except Exception as e:
         print(f"[DEBUG] LLM call failed: {e}", file=sys.stderr, flush=True)
-        return "flag_bug", "LLM call failed -- defaulting to flag_bug (safe choice)."
+        return "flag_bug", None, "LLM call failed -- defaulting to flag_bug."
 
     action_type = "flag_bug"  # safe default
-    comment = ""
+    severity    = None
+    comment     = ""
+
+    _valid_severities = {"critical", "medium", "low"}
 
     for line in raw.splitlines():
         line = line.strip()
@@ -156,10 +167,16 @@ def call_llm(client: OpenAI, prompt: str) -> tuple:
             candidate = line.split(":", 1)[1].strip().lower()
             if candidate in VALID_ACTIONS:
                 action_type = candidate
+        elif line.upper().startswith("SEVERITY:"):
+            candidate = line.split(":", 1)[1].strip().lower()
+            if candidate in _valid_severities:
+                severity = candidate
+            # "none" or anything else -> severity stays None
         elif line.upper().startswith("COMMENT:"):
             comment = line.split(":", 1)[1].strip()
 
-    return action_type, comment
+    return action_type, severity, comment
+
 
 
 # ── Score computation ─────────────────────────────────────────────────────────
@@ -196,10 +213,11 @@ def run_episode(difficulty: str = "all") -> None:
             while not obs.done:
                 steps_taken += 1
                 prompt = build_prompt(obs)
-                action_type, comment = call_llm(llm_client, prompt)
+                action_type, severity, comment = call_llm(llm_client, prompt)
 
                 action = CodeReviewAction(
                     action_type=action_type,
+                    severity=severity,
                     comment=comment,
                 )
 
@@ -213,7 +231,7 @@ def run_episode(difficulty: str = "all") -> None:
                     error  = str(e)
                     rewards.append(reward)
                     log_step(step=steps_taken, action=action_type, reward=reward, done=True, error=error)
-                    break  # logged, now exit loop
+                    break
 
                 rewards.append(reward)
                 log_step(

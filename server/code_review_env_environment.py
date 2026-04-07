@@ -1,8 +1,5 @@
 from uuid import uuid4
-try:
-    from code_review_env.models import CodeReviewAction, CodeReviewObservation
-except ImportError:
-    from code_review_env.models import CodeReviewAction, CodeReviewObservation
+from code_review_env.models import CodeReviewAction, CodeReviewObservation
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 from .tasks import get_tasks
@@ -16,11 +13,12 @@ class CodeReviewEnvironment(Environment):
         super().__init__()  # sets self.transform and self.rubric (required by base class)
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count = 0
+        self._seed = None
         self.difficulty = "easy"
         self.tasks = []
         self.current_index = 0
         self.steps_used = 0
-        self.steps_max = 15  # enough for all-difficulty episodes
+        self.steps_max = 15  # enough headroom for all-difficulty (15 tasks)
 
     # ──────────────────────────────────────────────────────────────
     # reset
@@ -28,18 +26,20 @@ class CodeReviewEnvironment(Environment):
     def reset(self, seed=None, episode_id=None, difficulty: str = "easy", **kwargs) -> CodeReviewObservation:
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count += 1
-
-        tasks_dict = get_tasks()
+        self._seed = seed
         self.difficulty = difficulty
+
+        # Use seed for reproducible task shuffling (Phase 2 variance check)
+        int_seed = int(seed) if seed is not None else None
 
         if difficulty == "all":
             self.tasks = (
-                tasks_dict["easy"]
-                + tasks_dict["medium"]
-                + tasks_dict["hard"]
+                get_tasks("easy",   seed=int_seed, n=5)
+                + get_tasks("medium", seed=int_seed, n=5)
+                + get_tasks("hard",   seed=int_seed, n=5)
             )
         else:
-            self.tasks = tasks_dict.get(difficulty, tasks_dict["easy"])
+            self.tasks = get_tasks(difficulty, seed=int_seed, n=5)
 
         self.current_index = 0
         self.steps_used = 0
@@ -52,24 +52,16 @@ class CodeReviewEnvironment(Environment):
     def step(self, action: CodeReviewAction) -> CodeReviewObservation:
         self._state.step_count += 1
 
-        # Safety: re-load tasks if empty (e.g. after deserialization)
+        # Safety: re-load tasks if empty (e.g. after unexpected deserialization)
         if not self.tasks:
-            tasks_dict = get_tasks()
-            if self.difficulty == "all":
-                self.tasks = (
-                    tasks_dict["easy"]
-                    + tasks_dict["medium"]
-                    + tasks_dict["hard"]
-                )
-            else:
-                self.tasks = tasks_dict.get(self.difficulty, tasks_dict["easy"])
+            self.tasks = get_tasks(self.difficulty, seed=self._seed, n=5)
 
         if self.current_index >= len(self.tasks):
             return self._get_observation(reward=0.0, done=True, feedback="Episode already complete.")
 
         current_task = self.tasks[self.current_index]
 
-        # Calculate partial-credit reward
+        # Calculate partial-credit reward (incorporates severity signal)
         reward, feedback = self._calculate_reward(action, current_task)
 
         self.steps_used += 1
@@ -87,15 +79,7 @@ class CodeReviewEnvironment(Environment):
     # ──────────────────────────────────────────────────────────────
     def _get_observation(self, reward: float, done: bool, feedback: str = "") -> CodeReviewObservation:
         if not self.tasks:
-            tasks_dict = get_tasks()
-            if self.difficulty == "all":
-                self.tasks = (
-                    tasks_dict["easy"]
-                    + tasks_dict["medium"]
-                    + tasks_dict["hard"]
-                )
-            else:
-                self.tasks = tasks_dict.get(self.difficulty, tasks_dict["easy"])
+            self.tasks = get_tasks(self.difficulty, seed=self._seed, n=5)
 
         total_tasks = len(self.tasks)
 
@@ -106,10 +90,8 @@ class CodeReviewEnvironment(Environment):
             task = self.tasks[self.current_index]
             steps_remaining = max(0, self.steps_max - self.steps_used)
 
-        diff = task.diff
-
         return CodeReviewObservation(
-            current_diff=diff,
+            current_diff=task.diff,
             steps_remaining=steps_remaining,
             step=self.steps_used,
             total_tasks=total_tasks,
@@ -127,59 +109,96 @@ class CodeReviewEnvironment(Environment):
         )
 
     # ──────────────────────────────────────────────────────────────
-    # _calculate_reward  (all values strictly in (0.1, 0.9))
+    # _calculate_reward
     # ──────────────────────────────────────────────────────────────
-    # Reward ladder (never exactly 0.0 or 1.0 — judge requires strict range):
-    #   0.90 correct action on easy/medium task
-    #   0.90 correct on hard task WITH explanatory comment
-    #   0.70 correct on hard task WITHOUT comment  (partial credit)
-    #   0.50 ignore on safe code  (cautious but acceptable — no harm)
-    #   0.30 ignore on a real bug  (missed the issue — bad, not catastrophic)
-    #   0.15 flag_bug on safe code  (false positive — wastes reviewer time)
-    #   0.10 approve a buggy diff  (worst outcome — ships a vulnerability)
+    # Reward ladder (strictly in (0.10, 0.90)):
+    #
+    #  flag_bug tasks (bugs that must be caught):
+    #   0.90  correct + correct severity (+ comment on hard)
+    #   0.87  correct + comment, no/wrong severity       [hard only]
+    #   0.85  correct + correct severity, no comment     [hard only]
+    #   0.83  correct flag_bug easy/medium + no severity
+    #   0.80  correct flag_bug hard + no comment + no severity
+    #   0.30  ignore a real bug  (missed it)
+    #   0.10  approve a buggy diff  (worst outcome)
+    #
+    #  approve tasks (safe code that must pass):
+    #   0.90  correct approve
+    #   0.50  ignore safe code  (cautious but acceptable)
+    #   0.15  flag_bug on safe code  (false positive)
+    #
+    #  ignore tasks (style issues, not worth flagging):
+    #   0.90  correct ignore
     # ──────────────────────────────────────────────────────────────
-    def _calculate_reward(self, action: CodeReviewAction, task) -> tuple[float, str]:
-        correct = task.correct_action
-        given = action.action_type
+    def _calculate_reward(self, action: CodeReviewAction, task) -> tuple:
+        correct   = task.correct_action
+        given     = action.action_type
         difficulty = task.difficulty
-        has_comment = bool(action.comment and action.comment.strip())
+        has_comment  = bool(action.comment and action.comment.strip())
+        has_severity = bool(action.severity)
 
-        # ── Correct action ────────────────────────────────────────
+        # Does the agent's severity classification match the task's expected severity?
+        expected_sev = task.correct_severity
+        severity_correct = (
+            expected_sev is None           # task has no expected severity → any is fine
+            or action.severity == expected_sev
+        )
+
+        # ── Correct action ─────────────────────────────────────────
         if given == correct:
-            if difficulty == "hard" and not has_comment:
-                # Hard tasks: partial credit without explanatory comment
-                return 0.70, (
-                    task.feedback_on_correct
-                    + " (Tip: add a comment explaining the vulnerability for full marks.)"
-                )
-            return 0.90, task.feedback_on_correct
 
-        # -- Wrong action -- nuanced penalties ----------------------
-        # ignore on a bug -> missed the issue (bad, but not catastrophic)
+            # All non-flag_bug correct actions: full marks (no severity signal)
+            if correct != "flag_bug":
+                return 0.90, task.feedback_on_correct
+
+            # --- Correct flag_bug: severity + comment affect the score ---
+
+            if difficulty == "hard":
+                # Hard tasks reward both explanation and correct severity classification
+                if has_comment and severity_correct:
+                    return 0.90, task.feedback_on_correct
+                if has_comment and not severity_correct:
+                    tip = " (Tip: also specify the correct severity level.)"
+                    return 0.87, task.feedback_on_correct + tip
+                if not has_comment and severity_correct and has_severity:
+                    tip = " (Tip: add a comment explaining the vulnerability for full marks.)"
+                    return 0.85, task.feedback_on_correct + tip
+                # No comment, wrong/missing severity
+                tip = " (Tip: add a comment and specify severity for full marks.)"
+                return 0.80, task.feedback_on_correct + tip
+
+            else:
+                # Easy / medium: severity is a bonus signal
+                if severity_correct and has_severity:
+                    return 0.90, task.feedback_on_correct
+                # No severity or wrong → small reduction (severity info is helpful)
+                tip = " (Tip: specify the severity level for more precise feedback.)"
+                return 0.83, task.feedback_on_correct + tip
+
+        # ── Wrong actions — nuanced penalties ──────────────────────
+
+        # ignore on a bug → missed the issue (bad but not catastrophic)
         if given == "ignore" and correct == "flag_bug":
-            return 0.30, (
-                "Incorrect -- you ignored a real bug. "
-                + task.feedback_on_wrong
-            )
+            return 0.30, "Incorrect — you ignored a real bug. " + task.feedback_on_wrong
 
-        # ignore on safe code -> cautious but acceptable
+        # ignore on safe code → cautious but acceptable
         if given == "ignore" and correct == "approve":
             return 0.50, (
-                "Acceptable -- you were cautious, but this diff is safe to approve. "
+                "Acceptable — you were cautious, but this diff is safe to approve. "
                 + task.feedback_on_wrong
             )
 
-        # flag_bug on safe code -> false positive (wastes reviewer time)
+        # flag_bug on safe code → false positive (wastes reviewer time)
         if given == "flag_bug" and correct == "approve":
             return 0.15, (
-                "Incorrect -- this diff is safe; flagging it is a false positive. "
+                "Incorrect — this diff is safe; flagging it is a false positive. "
                 + task.feedback_on_wrong
             )
 
-        # approve on a bug -> worst outcome (ships a vulnerability)
+        # approve on a bug → worst outcome (ships a vulnerability)
         if given == "approve" and correct == "flag_bug":
             return 0.10, (
-                "Incorrect -- you approved a buggy/vulnerable diff. "
+                "Incorrect — you approved a buggy/vulnerable diff. "
                 + task.feedback_on_wrong
             )
 

@@ -62,7 +62,6 @@ class CodeReviewEnv(
             "action_type": action.action_type,
             "severity": action.severity,
             "comment": action.comment,
-            "message": action.message,
         }
 
     def _parse_result(self, payload: Dict) -> StepResult[CodeReviewObservation]:
