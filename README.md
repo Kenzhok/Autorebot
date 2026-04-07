@@ -14,15 +14,15 @@ tags:
   - reinforcement-learning
 ---
 
-# 🔍 Code Review AI Environment
+# Code Review AI Environment
 
-An **OpenEnv**-compatible reinforcement learning environment where an AI agent acts as a senior code reviewer. The agent reads code diffs and decides whether to `flag_bug`, `approve`, or `ignore` them — receiving rewards based on correctness and explanation quality.
+An **OpenEnv**-compatible reinforcement learning environment where an AI agent acts as a senior code reviewer. The agent reads code diffs and decides whether to `flag_bug`, `approve`, or `ignore` them -- receiving rewards based on correctness and explanation quality.
 
-Built for the **Meta × Scaler OpenEnv AI Hackathon**.
+Built for the **Meta x Scaler OpenEnv AI Hackathon**.
 
 ---
 
-## 🏗️ Environment Overview
+## Environment Overview
 
 | Property | Value |
 |---|---|
@@ -35,18 +35,18 @@ Built for the **Meta × Scaler OpenEnv AI Hackathon**.
 
 ---
 
-## 📋 Action Space
+## Action Space
 
 ```python
 class CodeReviewAction(Action):
     action_type: str   # "flag_bug" | "approve" | "ignore"
-    comment: str       # Explanation — used for partial credit on hard tasks
+    comment: str       # Explanation -- used for partial credit on hard tasks
     severity: str      # Optional: "critical" | "medium" | "low"
 ```
 
 ---
 
-## 👁️ Observation Space
+## Observation Space
 
 ```python
 class CodeReviewObservation(Observation):
@@ -73,7 +73,7 @@ class Diff(BaseModel):
 
 ---
 
-## 🎯 Reward Function (Partial Credit)
+## Reward Function (Partial Credit)
 
 | Situation | Reward |
 |---|---|
@@ -87,7 +87,7 @@ class Diff(BaseModel):
 
 ---
 
-## 📚 Task Descriptions
+## Task Descriptions
 
 ### Easy (5 tasks)
 | ID | Description | Correct Action |
@@ -103,7 +103,7 @@ class Diff(BaseModel):
 |---|---|---|
 | m1 | User profile fetch with no auth check | `flag_bug` |
 | m2 | Password stored in plaintext | `flag_bug` |
-| m3 | Loop accessing `items[i+1]` — off-by-one | `flag_bug` |
+| m3 | Loop accessing `items[i+1]` -- off-by-one | `flag_bug` |
 | m4 | Auth token written to application logs | `flag_bug` |
 | m5 | Shared counter incremented across threads without a lock | `flag_bug` |
 
@@ -112,13 +112,13 @@ class Diff(BaseModel):
 |---|---|---|
 | h1 | JWT decoded with `verify_signature: False` | `flag_bug` |
 | h2 | `pickle.loads()` on untrusted user input | `flag_bug` |
-| h3 | Regex with nested quantifiers — ReDoS vulnerability | `flag_bug` |
-| h4 | HTTP request to user-controlled URL — SSRF | `flag_bug` |
+| h3 | Regex with nested quantifiers -- ReDoS vulnerability | `flag_bug` |
+| h4 | HTTP request to user-controlled URL -- SSRF | `flag_bug` |
 | h5 | Clean, tested order processing function | `approve` |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Docker (Recommended)
 
@@ -163,7 +163,7 @@ python inference.py --difficulty all
 ```python
 from code_review_env import CodeReviewAction, CodeReviewEnv
 
-with CodeReviewEnv(base_url="https://YOUR-SPACE.hf.space") as env:
+with CodeReviewEnv(base_url="https://YOUR-SPACE.hf.space").sync() as env:
     result = env.reset()
     print(result.observation.current_diff.diff_text)
 
@@ -175,7 +175,7 @@ with CodeReviewEnv(base_url="https://YOUR-SPACE.hf.space") as env:
 
 ---
 
-## 📊 Baseline Scores
+## Baseline Scores
 
 Measured over a full `difficulty=all` episode (15 tasks):
 
@@ -187,30 +187,30 @@ Measured over a full `difficulty=all` episode (15 tasks):
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 code_review_env/
-├── __init__.py                          # Package exports
-├── agent.py                             # Rule-based + LLM agent
-├── client.py                            # OpenEnv HTTP/WebSocket client
-├── inference.py                         # 🔴 Judge inference script (LLM agent)
-├── models.py                            # Pydantic Action / Observation / Diff models
-├── openenv.yaml                         # OpenEnv manifest
-├── pyproject.toml                       # Package config & dependencies
-├── README.md                            # This file
-├── run_demo.py                          # Local demo runner (rule-based agent)
-└── server/
-    ├── __init__.py
-    ├── app.py                           # FastAPI server (HTTP + WebSocket)
-    ├── code_review_env_environment.py   # Core RL environment logic
-    ├── tasks.py                         # 15-task dataset with graders
-    └── requirements.txt                 # Server dependencies
++-- __init__.py                          # Package exports
++-- agent.py                             # Rule-based + LLM agent
++-- client.py                            # OpenEnv HTTP/WebSocket client
++-- inference.py                         # [JUDGE] inference script (LLM agent)
++-- models.py                            # Pydantic Action / Observation / Diff models
++-- openenv.yaml                         # OpenEnv manifest
++-- pyproject.toml                       # Package config & dependencies
++-- README.md                            # This file
++-- run_demo.py                          # Local demo runner (rule-based agent)
++-- server/
+    +-- __init__.py
+    +-- app.py                           # FastAPI server (HTTP + WebSocket)
+    +-- code_review_env_environment.py   # Core RL environment logic
+    +-- tasks.py                         # 15-task dataset with graders
+    +-- requirements.txt                 # Server dependencies
 ```
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -224,7 +224,7 @@ code_review_env/
 
 ---
 
-## ✅ Pre-Submission Validation
+## Pre-Submission Validation
 
 ```bash
 # Validate OpenEnv spec compliance
