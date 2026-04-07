@@ -186,7 +186,7 @@ def run_episode(difficulty: str = "all") -> None:
     score        = 0.0
     success      = False
 
-    with CodeReviewEnv(base_url=ENV_URL) as env:
+    with CodeReviewEnv(base_url=ENV_URL).sync() as env:
         log_start(task=task_name, env_name=BENCHMARK, model=MODEL_NAME)
 
         try:
