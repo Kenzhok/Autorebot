@@ -1,9 +1,20 @@
 from typing import Dict, List
 from pydantic import BaseModel
-try:
-    from ..models import Diff
-except ImportError:
-    from models import Diff
+import importlib, sys
+
+# Always resolve Diff from the same module object to avoid Pydantic
+# "two different classes" validation errors when sys.path varies.
+# Priority: package import → direct import → code_review_env package import
+def _import_diff():
+    for mod_name in ("code_review_env.models", "models"):
+        try:
+            mod = importlib.import_module(mod_name)
+            return mod.Diff
+        except (ImportError, AttributeError):
+            continue
+    raise ImportError("Cannot import Diff from code_review_env.models or models")
+
+Diff = _import_diff()
 
 
 class Task(BaseModel):

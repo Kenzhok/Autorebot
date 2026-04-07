@@ -1,10 +1,12 @@
 from openenv.core.env_server.types import Action, Observation
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from typing import List, Optional
 from pydantic import BaseModel
 
 
 class Diff(BaseModel):
+    model_config = ConfigDict(revalidate_instances="never")
+
     id: str = Field(..., description="Unique diff id")
     diff_text: str = Field(..., description="Code changes shown as a diff")
     risk_hints: List[str] = Field(default_factory=list, description="Hints like sql_concat, missing_auth, etc.")
@@ -13,6 +15,15 @@ class Diff(BaseModel):
 
 
 class CodeReviewObservation(Observation):
+    # Override config to allow Diff instances to pass through without re-validation
+    # (Pydantic v2 with extra='forbid' on parent rejects model instances by default)
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+        revalidate_instances="never",
+    )
+
     current_diff: Diff
     steps_remaining: int = Field(..., description="Steps left in this episode")
     step: int = Field(default=0, description="Current step number")
@@ -36,6 +47,3 @@ class CodeReviewAction(Action):
         default="",
         description="Optional explanation -- used for partial credit on hard tasks"
     )
-
-    # Required for OpenEnv compatibility
-    message: str = "ok"

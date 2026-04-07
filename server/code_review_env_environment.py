@@ -13,6 +13,7 @@ class CodeReviewEnvironment(Environment):
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
     def __init__(self):
+        super().__init__()  # sets self.transform and self.rubric (required by base class)
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count = 0
         self.difficulty = "easy"
@@ -24,7 +25,7 @@ class CodeReviewEnvironment(Environment):
     # ──────────────────────────────────────────────────────────────
     # reset
     # ──────────────────────────────────────────────────────────────
-    def reset(self, difficulty: str = "easy") -> CodeReviewObservation:
+    def reset(self, seed=None, episode_id=None, difficulty: str = "easy", **kwargs) -> CodeReviewObservation:
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count += 1
 
