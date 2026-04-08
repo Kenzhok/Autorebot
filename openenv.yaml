@@ -86,7 +86,7 @@ tasks:
       Review 5 easy code diffs for hardcoded secrets, SQL f-string injection,
       division-by-zero without guard, unused imports (style, should ignore),
       and a safe well-tested utility function (should approve).
-    grader: code_review_env.server.graders:easy_grader
+    grader: graders:easy_grader
 
   - name: medium_code_review
     description: >
@@ -94,7 +94,7 @@ tasks:
       data access, plaintext password storage, off-by-one index errors,
       sensitive auth token written to logs, and an unsynchronised shared counter
       (race condition).
-    grader: code_review_env.server.graders:medium_grader
+    grader: graders:medium_grader
 
   - name: hard_code_review
     description: >
@@ -102,4 +102,4 @@ tasks:
       verification bypass, insecure pickle deserialisation (RCE), ReDoS via
       catastrophic regex backtracking, Server-Side Request Forgery (SSRF),
       and complex well-tested business logic (should approve).
-    grader: code_review_env.server.graders:hard_grader
+    grader: graders:hard_grader

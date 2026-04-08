@@ -27,4 +27,5 @@ Thumbs.db
 # Scratch / debug output files (generated locally, not part of project)
 test_out.txt
 test_results.txt
+validate_out.txt
 envclient_src.txt
