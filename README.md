@@ -156,9 +156,9 @@ severity classification as an additional signal.
 Each difficulty tier has an independent grader that evaluates the full episode trajectory:
 
 ```python
-easy_grader(trajectory: dict)   -> float  # (0.01, 0.99)
-medium_grader(trajectory: dict) -> float  # (0.01, 0.99)
-hard_grader(trajectory: dict)   -> float  # (0.01, 0.99)
+easy_grader(trajectory: dict = None)   -> float  # (0.01, 0.99)
+medium_grader(trajectory: dict = None) -> float  # (0.01, 0.99)
+hard_grader(trajectory: dict = None)   -> float  # (0.01, 0.99)
 ```
 
 Grader scoring logic:
@@ -258,6 +258,7 @@ code_review_env/
 | `POST` | `/step` | Submit action, receive observation + reward |
 | `GET` | `/state` | Get current episode state |
 | `GET` | `/schema` | Get action/observation JSON schemas |
+| `GET` | `/tasks` | List of supported environment tasks and grader mappings |
 | `WS` | `/ws` | WebSocket for persistent sessions |
 | `GET` | `/docs` | Swagger API documentation |
 
