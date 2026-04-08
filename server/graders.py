@@ -121,7 +121,7 @@ def _weighted_score(
 
 # ── Public grader functions ────────────────────────────────────────────────────
 
-def easy_grader(trajectory: dict) -> float:
+def easy_grader(trajectory: dict = None) -> float:
     """
     Grader for easy code-review tasks.
 
@@ -141,17 +141,16 @@ def easy_grader(trajectory: dict) -> float:
     Returns:
         float strictly in (0.01, 0.99).
     """
+    trajectory = trajectory or {}
     rewards: List[float] = trajectory.get("rewards", [])
     return _weighted_score(
         rewards,
-        approve_bug_penalty=0.18,  # high: easy bugs should be obvious
-        missed_bug_penalty=0.05,
-        consistency_bonus=0.03,
-        explanation_bonus=0.01,
+        consistency_bonus=0.05,
+        approve_bug_penalty=0.40,
     )
 
 
-def medium_grader(trajectory: dict) -> float:
+def medium_grader(trajectory: dict = None) -> float:
     """
     Grader for medium code-review tasks.
 
@@ -164,6 +163,7 @@ def medium_grader(trajectory: dict) -> float:
     Returns:
         float strictly in (0.01, 0.99).
     """
+    trajectory = trajectory or {}
     rewards: List[float] = trajectory.get("rewards", [])
     return _weighted_score(
         rewards,
@@ -174,7 +174,7 @@ def medium_grader(trajectory: dict) -> float:
     )
 
 
-def hard_grader(trajectory: dict) -> float:
+def hard_grader(trajectory: dict = None) -> float:
     """
     Grader for hard code-review tasks.
 
@@ -195,6 +195,7 @@ def hard_grader(trajectory: dict) -> float:
     Returns:
         float strictly in (0.01, 0.99).
     """
+    trajectory = trajectory or {}
     rewards: List[float] = trajectory.get("rewards", [])
     return _weighted_score(
         rewards,

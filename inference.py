@@ -195,9 +195,9 @@ def compute_score(rewards: List[float]) -> float:
 
 
 # ── Main episode loop ──────────────────────────────────────────────────────────
-def run_episode(difficulty: str = "all") -> None:
+def run_episode(difficulty: str) -> None:
     llm_client   = get_llm_client()
-    task_name    = f"code_review_{difficulty}"
+    task_name    = f"{difficulty}_code_review"
     rewards: List[float] = []
     steps_taken  = 0
     score        = 0.0
@@ -272,4 +272,14 @@ if __name__ == "__main__":
         help="Difficulty level of tasks to run (default: all)",
     )
     args = parser.parse_args()
-    run_episode(difficulty=args.difficulty)
+    
+    target_task = os.getenv("TASK_NAME")
+    if target_task:
+        if "easy" in target_task: args.difficulty = "easy"
+        elif "medium" in target_task: args.difficulty = "medium"
+        elif "hard" in target_task: args.difficulty = "hard"
+
+    difficulties = ["easy", "medium", "hard"] if args.difficulty == "all" else [args.difficulty]
+    
+    for diff in difficulties:
+        run_episode(difficulty=diff)
