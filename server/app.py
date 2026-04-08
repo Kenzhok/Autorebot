@@ -62,7 +62,7 @@ async def list_tasks():
             "name": "Easy Code Review",
             "description": "Review 5 easy code diffs for hardcoded secrets, SQL f-string injection, division-by-zero without guard, unused imports, and a safe trusted utility function.",
             "difficulty": "easy",
-            "grader": "server.graders.easy_grader",
+            "grader": "code_review_env.server.graders.easy_grader",
             "time_limit_seconds": 600,
             "max_steps": 15
         },
@@ -71,7 +71,7 @@ async def list_tasks():
             "name": "Medium Code Review",
             "description": "Review 5 medium-difficulty diffs covering missing authentication, plaintext password storage, off-by-one errors, and race conditions.",
             "difficulty": "medium",
-            "grader": "server.graders.medium_grader",
+            "grader": "code_review_env.server.graders.medium_grader",
             "time_limit_seconds": 600,
             "max_steps": 15
         },
@@ -80,7 +80,7 @@ async def list_tasks():
             "name": "Hard Code Review",
             "description": "Review 5 hard diffs requiring deep security expertise: JWT signature bypass, insecure pickle deserialisation, ReDoS, and SSRF.",
             "difficulty": "hard",
-            "grader": "server.graders.hard_grader",
+            "grader": "code_review_env.server.graders.hard_grader",
             "time_limit_seconds": 600,
             "max_steps": 15
         }
