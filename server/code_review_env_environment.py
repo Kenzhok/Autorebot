@@ -27,6 +27,14 @@ class CodeReviewEnvironment(Environment):
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count += 1
         self._seed = seed
+        
+        # Sniff out the task_id if the Phase 2 Validator forces it
+        task_id = kwargs.get("task_id", kwargs.get("task_name"))
+        if task_id:
+            if "easy" in task_id: difficulty = "easy"
+            elif "medium" in task_id: difficulty = "medium"
+            elif "hard" in task_id: difficulty = "hard"
+
         self.difficulty = difficulty
 
         # Use seed for reproducible task shuffling (Phase 2 variance check)

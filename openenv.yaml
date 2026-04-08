@@ -81,25 +81,25 @@ difficulties:
 max_steps: 15
 
 tasks:
-  - name: easy_code_review
+  - id: easy_code_review
     description: >
       Review 5 easy code diffs for hardcoded secrets, SQL f-string injection,
       division-by-zero without guard, unused imports (style, should ignore),
       and a safe well-tested utility function (should approve).
-    grader: graders:easy_grader
+    grader: server.graders.easy_grader
 
-  - name: medium_code_review
+  - id: medium_code_review
     description: >
       Review 5 medium-difficulty diffs covering missing authentication before
       data access, plaintext password storage, off-by-one index errors,
       sensitive auth token written to logs, and an unsynchronised shared counter
       (race condition).
-    grader: graders:medium_grader
+    grader: server.graders.medium_grader
 
-  - name: hard_code_review
+  - id: hard_code_review
     description: >
       Review 5 hard diffs requiring deep security expertise: JWT signature-
       verification bypass, insecure pickle deserialisation (RCE), ReDoS via
       catastrophic regex backtracking, Server-Side Request Forgery (SSRF),
       and complex well-tested business logic (should approve).
-    grader: graders:hard_grader
+    grader: server.graders.hard_grader

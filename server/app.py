@@ -53,6 +53,40 @@ app = create_app(
 )
 
 
+@app.get("/tasks", tags=["Environment Info"], summary="List all tasks with graders")
+async def list_tasks():
+    """Return the list of available tasks, their difficulties, and grader info."""
+    return [
+        {
+            "id": "easy_code_review",
+            "name": "Easy Code Review",
+            "description": "Review 5 easy code diffs for hardcoded secrets, SQL f-string injection, division-by-zero without guard, unused imports, and a safe trusted utility function.",
+            "difficulty": "easy",
+            "grader": "server.graders.easy_grader",
+            "time_limit_seconds": 600,
+            "max_steps": 15
+        },
+        {
+            "id": "medium_code_review",
+            "name": "Medium Code Review",
+            "description": "Review 5 medium-difficulty diffs covering missing authentication, plaintext password storage, off-by-one errors, and race conditions.",
+            "difficulty": "medium",
+            "grader": "server.graders.medium_grader",
+            "time_limit_seconds": 600,
+            "max_steps": 15
+        },
+        {
+            "id": "hard_code_review",
+            "name": "Hard Code Review",
+            "description": "Review 5 hard diffs requiring deep security expertise: JWT signature bypass, insecure pickle deserialisation, ReDoS, and SSRF.",
+            "difficulty": "hard",
+            "grader": "server.graders.hard_grader",
+            "time_limit_seconds": 600,
+            "max_steps": 15
+        }
+    ]
+
+
 def main(host: str = "0.0.0.0", port: int = 7860):
     """
     Entry point for direct execution via uv run or python -m.
