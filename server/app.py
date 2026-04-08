@@ -39,8 +39,8 @@ try:
     from ..models import CodeReviewAction, CodeReviewObservation
     from .code_review_env_environment import CodeReviewEnvironment
 except ImportError:
-    from models import CodeReviewAction, CodeReviewObservation
-    from server.code_review_env_environment import CodeReviewEnvironment
+    from code_review_env.models import CodeReviewAction, CodeReviewObservation
+    from code_review_env.server.code_review_env_environment import CodeReviewEnvironment
 
 
 # Create the app with web interface and README integration
